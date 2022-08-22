@@ -45,7 +45,7 @@ modSource: dict[str, list[str]] = {
 
 def parseModrinth(mod: str, isURL: bool) -> dict[str, str]:
     if isURL:
-        mod = mod.replace("https://modrinth.com/mod/", "")
+        mod = mod.split("/")[4]
 
     r = client.request("GET", f"https://api.modrinth.com/v2/project/{mod}")
     if r.status_code >= 400:
@@ -87,6 +87,8 @@ def parseGithub(mod: str) -> dict[str, str]:
 
 
 def defineMod(mod: str) -> None:
+    if mod.startswith("#!#"):
+        return
     try:
         if "http" not in mod:
             modurl = f"https://{mod}"
