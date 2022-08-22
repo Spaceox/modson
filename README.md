@@ -3,7 +3,7 @@
 Categorizes MC mods in a JSON file.
 Currently supports Modrinth, Github and (kinda) Curseforge.
 
-Requires `httpx`
+Requires `requests`
 
 ## Curseforge
 Curseforge doesn't have a public API and since this app just needs to know the mod's name (and I don't want to force people to create a key for this application), modson tries to get the page title, instead of calling the API.

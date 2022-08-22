@@ -1,10 +1,9 @@
 import json
 import time
-import httpx
+import requests
 import argparse
 import os
 
-headers = {"user-agent": "github_com/Spaceox/modson"}
 
 parser = argparse.ArgumentParser(
     prog="modson",
@@ -32,7 +31,8 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-client = httpx.Client(headers=headers)
+client = requests.Session()
+client.headers.update({"User-Agent": "github_com/Spaceox/modson"})
 fullOut = args.out + "/modson.json"
 
 modSource: dict[str, list[str]] = {
@@ -94,9 +94,10 @@ def defineMod(mod: str) -> None:
             modurl = mod
 
         client.request("HEAD", modurl)
-    except httpx.HTTPError:
+    except requests.exceptions.ConnectionError:
         print("This doesn't seem a valid url, treating as modrinth mod.")
         modSource["modrinthID"].append(mod)
+        return
 
     if "modrinth.com" in mod:
         print("Modrinth link found.")
@@ -131,13 +132,16 @@ else:
 
 for mod in modSource["modrinthID"]:
     modsonOut["mods"].append(parseModrinth(mod, False))
-    time.sleep(5)
+    if mod != modSource["modrinthID"][-1]:
+        time.sleep(5)
 for mod in modSource["modrinth"]:
     modsonOut["mods"].append(parseModrinth(mod, True))
-    time.sleep(5)
+    if mod != modSource["modrinth"][-1]:
+        time.sleep(5)
 for mod in modSource["github"]:
     modsonOut["mods"].append(parseGithub(mod))
-    time.sleep(5)
+    if mod != modSource["github"][-1]:
+        time.sleep(5)
 
 if modSource["curseforge"] != []:
     try:
@@ -145,7 +149,8 @@ if modSource["curseforge"] != []:
 
         for mod in modSource["curseforge"]:
             modsonOut["mods"].append(cfmod.parseCurseForge(mod))
-            time.sleep(5)
+            if mod != modSource["curseforge"][-1]:
+                time.sleep(5)
     except ImportError:
         print(
             "cfmod.py wasn't found. Curseforge links are not supported without it\nSkipping Curseforge."
