@@ -14,8 +14,10 @@ def parseCurseForge(mod: str) -> dict[str, str]:
             .rstrip(" ")
         )
         if modName == "Just a moment...":
-            print("Cloudflare detected. Retrying in 10 seconds...")
-            time.sleep(10)
+            print(
+                "Cloudflare browser detection thing-y detected. Retrying in 120 seconds..."
+            )
+            time.sleep(120)
             continue
         else:
             break
