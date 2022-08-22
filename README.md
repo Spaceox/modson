@@ -3,7 +3,7 @@
 Categorizes MC mods in a JSON file.
 Currently supports Modrinth, Github and (kinda) Curseforge.
 
-Requires `requests`
+Requires `requests` and `validators`
 
 You can comment links out by putting #!# before the link
 

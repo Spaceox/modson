@@ -1,9 +1,11 @@
+import validators  # type: ignore[import]
 import json
 import time
 import requests
 import argparse
 import os
 
+start = time.perf_counter()
 
 parser = argparse.ArgumentParser(
     prog="modson",
@@ -20,7 +22,12 @@ parser.add_argument(
     action="store_true",
 )
 parser.add_argument(
-    "-u",
+    "--predupes",
+    help="If passed, the script will remove duplicates from the list of mods before putting them in the JSON.",
+    action="store_true",
+)
+parser.add_argument(
+    "--postdupes",
     help="If passed, the script will remove duplicates from the output JSON file.",
     action="store_true",
 )
@@ -36,6 +43,13 @@ client.headers.update({"User-Agent": "github_com/Spaceox/modson"})
 fullOut = args.out + "/modson.json"
 
 modSource: dict[str, list[str]] = {
+    "modrinth": [],
+    "modrinthID": [],
+    "github": [],
+    "curseforge": [],
+}
+
+filteredSources: dict[str, list[str]] = {
     "modrinth": [],
     "modrinthID": [],
     "github": [],
@@ -95,7 +109,8 @@ def defineMod(mod: str) -> None:
         else:
             modurl = mod
 
-        client.request("HEAD", modurl)
+        validators.url(modurl)
+        # client.request("HEAD", modurl)
     except requests.exceptions.ConnectionError:
         print("This doesn't seem a valid url, treating as modrinth mod.")
         modSource["modrinthID"].append(mod)
@@ -128,22 +143,35 @@ if args.f:
         for line in f:
             mod = line.rstrip("\n")
             defineMod(mod)
-            time.sleep(2)
+            # time.sleep(0.5)
 else:
     defineMod(args.mods)
 
+if args.predupes:
+    print(
+        "Checking for duplicates, this might take a while depending on the amount of mods."
+    )
+
+    for sub in modSource:
+        for mod in modSource[sub]:
+            if mod not in filteredSources[sub]:
+                filteredSources[sub].append(mod)
+
+    modSource = filteredSources
+
+print("Getting mod info")
 for mod in modSource["modrinthID"]:
     modsonOut["mods"].append(parseModrinth(mod, False))
     if mod != modSource["modrinthID"][-1]:
-        time.sleep(5)
+        time.sleep(2)
 for mod in modSource["modrinth"]:
     modsonOut["mods"].append(parseModrinth(mod, True))
     if mod != modSource["modrinth"][-1]:
-        time.sleep(5)
+        time.sleep(2)
 for mod in modSource["github"]:
     modsonOut["mods"].append(parseGithub(mod))
     if mod != modSource["github"][-1]:
-        time.sleep(5)
+        time.sleep(2)
 
 if modSource["curseforge"] != []:
     try:
@@ -152,13 +180,13 @@ if modSource["curseforge"] != []:
         for mod in modSource["curseforge"]:
             modsonOut["mods"].append(cfmod.parseCurseForge(mod))
             if mod != modSource["curseforge"][-1]:
-                time.sleep(5)
+                time.sleep(2)
     except ImportError:
         print(
             "cfmod.py wasn't found. Curseforge links are not supported without it\nSkipping Curseforge."
         )
 
-if args.u:
+if args.postdupes:
     print(
         "Checking for duplicates, this might take a while depending on the amount of mods."
     )
@@ -170,3 +198,6 @@ if args.u:
 
 with open(fullOut, "w", encoding="utf-8") as out:
     json.dump(modsonOut, out, ensure_ascii=False, indent=4)
+
+end = time.perf_counter()
+print(f"Took {end - start}s to execute")
