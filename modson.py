@@ -1,4 +1,5 @@
 import json
+import time
 import httpx
 import argparse
 import os
@@ -34,6 +35,13 @@ args = parser.parse_args()
 client = httpx.Client(headers=headers)
 fullOut = args.out + "/modson.json"
 
+modSource: dict[str, list[str]] = {
+    "modrinth": [],
+    "modrinthID": [],
+    "github": [],
+    "curseforge": [],
+}
+
 
 def parseModrinth(mod: str, isURL: bool) -> dict[str, str]:
     if isURL:
@@ -65,7 +73,7 @@ def parseModrinth(mod: str, isURL: bool) -> dict[str, str]:
 
 def parseGithub(mod: str) -> dict[str, str]:
     modApi = mod.split("/")
-    r = client.request("GET", f"https://api.github.com/repos/{mod[3]}/{mod[4]}")
+    r = client.request("GET", f"https://api.github.com/repos/{modApi[3]}/{modApi[4]}")
     modInfo = r.json()
     modJson = {
         "name": modInfo["name"],
@@ -78,52 +86,70 @@ def parseGithub(mod: str) -> dict[str, str]:
     return modJson
 
 
-def defineMod(mod: str) -> dict[str, str]:
+def defineMod(mod: str) -> None:
     try:
-        r = client.request("HEAD", mod)
-        if r.status_code >= 400:
-            if "modrinth.com" in mod:
-                print("Modrinth link detected.")
-                return parseModrinth(mod, True)
-            elif "github.com" in mod:
-                print("Github link detected.")
-                return parseGithub(mod)
-            elif "curseforge.com" in mod:
-                print("Curseforge link detected.")
-                try:
-                    import cfmod
-
-                    modInfo = cfmod.parseCurseForge(mod)
-                except ImportError:
-                    raise ImportError(
-                        "cfmod.py wasn't found. Curseforge links are not supported without it."
-                    )
-                return modInfo
-            else:
-                raise ValueError(f"This site is not supported yet, sorry. URL: '{mod}'")
+        if "http" not in mod:
+            modurl = f"https://{mod}"
         else:
-            raise ConnectionError(
-                f"Check that the url is typed correctly and try again later. URL: '{mod}'"
-            )
+            modurl = mod
+
+        client.request("HEAD", modurl)
     except httpx.HTTPError:
-        print("This doesn't seem like an url, treating as modrinth mod.")
-        return parseModrinth(mod, False)
+        print("This doesn't seem a valid url, treating as modrinth mod.")
+        modSource["modrinthID"].append(mod)
+
+    if "modrinth.com" in mod:
+        print("Modrinth link found.")
+        modSource["modrinth"].append(modurl)
+    elif "github.com" in mod:
+        print("Github link found.")
+        modSource["github"].append(modurl)
+    elif "curseforge.com" in mod:
+        print("Curseforge link found.")
+        modSource["curseforge"].append(modurl)
+    else:
+        raise ValueError(f"This site is not supported yet, sorry. URL: '{mod}'")
 
 
 try:
     with open(fullOut, "r") as f:
         modsonOut = json.load(f)
+        print("Loaded modson.json")
 except FileNotFoundError:
-    print("It seems like the json file doesn't exist, creating it.")
+    print("The json file doesn't exist, creating one.")
     modsonOut = json.loads('{"mods": []}')
 
+print("Categorizing links, this might take a while")
 if args.f:
     with open(args.mods, "r") as f:
         for line in f:
             mod = line.rstrip("\n")
-            modsonOut["mods"].append(defineMod(mod))
+            defineMod(mod)
+            time.sleep(2)
 else:
-    modsonOut["mods"].append(defineMod(args.mods))
+    defineMod(args.mods)
+
+for mod in modSource["modrinthID"]:
+    modsonOut["mods"].append(parseModrinth(mod, False))
+    time.sleep(5)
+for mod in modSource["modrinth"]:
+    modsonOut["mods"].append(parseModrinth(mod, True))
+    time.sleep(5)
+for mod in modSource["github"]:
+    modsonOut["mods"].append(parseGithub(mod))
+    time.sleep(5)
+
+if modSource["curseforge"] != []:
+    try:
+        import cfmod
+
+        for mod in modSource["curseforge"]:
+            modsonOut["mods"].append(cfmod.parseCurseForge(mod))
+            time.sleep(5)
+    except ImportError:
+        print(
+            "cfmod.py wasn't found. Curseforge links are not supported without it\nSkipping Curseforge."
+        )
 
 if args.u:
     print(
